@@ -1,6 +1,6 @@
 # awtrixng-github-heatmap
 
-![preview](./README.assets/preview.png)
+![preview](./README.assets/preview.gif)
 
 A GitHub contribution heatmap for AWTRIX NG, rendered on the 32×8 LED panel.
 
@@ -44,7 +44,7 @@ curl "https://awtrixng-github-heatmap-worker.xxx.workers.dev/?user=<github-usern
 
 You can also bind the worker to a custom domain instead of `*.workers.dev`.
 
-## 3. Protect the worker with Cloudflare Access (Optional)
+## 3. (Optional) Protect the worker with Cloudflare Access
 
 Left open, anyone with the URL can query arbitrary accounts and burn your API quota. Access control is recommended.
 
