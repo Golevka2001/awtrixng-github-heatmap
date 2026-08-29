@@ -1,15 +1,16 @@
 # @name    GitHub Heatmap
 # @desc    GitHub contribution heatmap via external worker
 # @author  Golevka2001
-# @version 1.0
+# @version 1.1
 # @config  server         text    "Server URL"  help="Worker endpoint URL"
 # @config  user           text    "Username"  help="GitHub username"
 # @config  client_id      text    "(optional) CF Access Client ID"
 # @config  client_secret  text    "(optional) CF Access Client Secret"
+# @config  rainbow        bool    "Rainbow Months"  default=1
 # @config  every          number  "Refresh"  default=60  min=1  unit=min
 
 class GitHubHeatmap
-  var url, usr, client_id, client_secret, pixels
+  var url, usr, client_id, client_secret, rainbow, pixels
   # Refresh state: ticks counts down to the next fetch, span is the configured
   # interval in seconds, retry is the current backoff delay, busy means a
   # request is still out.
@@ -28,6 +29,8 @@ class GitHubHeatmap
     self.client_id = cid == nil ? "" : str(cid)
     var secret = store.get("client_secret")
     self.client_secret = secret == nil ? "" : str(secret)
+    var rb = store.get("rainbow")
+    self.rainbow = rb == nil ? true : rb
     self.pixels = []
     self.ticks = 0
     self.span = 60
@@ -78,7 +81,8 @@ class GitHubHeatmap
       http.get(self.url, / b, st -> self.on_body(b, st),
                {'headers': {'CF-Access-Client-Id': self.client_id,
                             'CF-Access-Client-Secret': self.client_secret,
-                            'X-User': self.usr}})
+                            'X-User': self.usr,
+                            'X-Rainbow': self.rainbow ? "1" : "0"}})
     end
   end
 

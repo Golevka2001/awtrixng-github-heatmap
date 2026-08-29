@@ -15,7 +15,7 @@ AWTRIX app ──▶ Cloudflare Worker ──GraphQL──▶ GitHub API
 | `github-heatmap.ax` | AWTRIX NG custom app (Berry): fetches the worker on an interval and paints the response                    |
 | `workers/`          | Cloudflare Worker: queries the GitHub GraphQL contribution calendar and renders it as the JSON array above |
 
-Rendering conventions: the panel shows the last 32 weeks; rows 1–7 map Sunday through Saturday, the rightmost column is the current week, and row 0 carries the grey month marker.
+Rendering conventions: the panel shows the last 32 weeks; rows 1–7 map Sunday through Saturday, the rightmost column is the current week, and row 0 carries the month marker (grey, or a per-month hue when Rainbow Months is on).
 
 ## 1. Create a GitHub token
 
@@ -86,6 +86,7 @@ Visit the AWTRIX NG web interface, go to **Scripts** and paste `github-heatmap.a
 | Server URL                              | The worker URL from step 2                                                |
 | Username                                | GitHub username                                                           |
 | (optional) CF Access Client ID / Secret | The service token from step 3. Leave empty if not using Cloudflare Access |
+| Rainbow Months                          | Color the month marker with a per-month hue; on by default        |
 | Refresh                                 | Refresh interval in minutes                                               |
 
 Behavior notes: the **select** button forces an immediate refresh; failed requests back off exponentially starting at 30 s, capped at `every`.

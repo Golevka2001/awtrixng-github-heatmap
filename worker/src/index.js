@@ -1,6 +1,6 @@
 // GitHub contribution heatmap for AWTRIX NG.
 //
-// GET /?user=<github_username>
+// GET /?user=<github_username>[&rainbow=0]
 //
 // Returns a flat JSON array of 256 packed 0xRRGGBB integers (32x8, row-major)
 // ready for the Berry app to paint pixel-by-pixel.
@@ -45,8 +45,9 @@ export default {
 async function handle(request, env) {
   const q = new URL(request.url).searchParams;
   const user = request.headers.get("X-User") || q.get("user");
+  const rainbow = (request.headers.get("X-Rainbow") || q.get("rainbow") || "1") !== "0";
 
-  console.log("request", { user });
+  console.log("request", { user, rainbow });
 
   if (!user) return json({ error: "missing user" }, 400);
 
@@ -115,14 +116,38 @@ async function handle(request, env) {
   }
 
   console.log("github response", { user, days: days.length });
-  return json(buildGrid(days));
+  return json(buildGrid(days, { rainbow }));
 }
 
 // ---------------------------------------------------------------------------
 // Pure computation — exported for testing.
 // ---------------------------------------------------------------------------
 
-export function buildColumn(dayList) {
+// Rainbow months: each month's marker gets a fixed hue on the color wheel,
+// so adjacent months are visually distinct at a glance.
+export function monthHue(month) {
+  return ((month - 1) / 12) * 360;
+}
+
+export function hsvToPacked(h, s, v) {
+  s /= 100;
+  v /= 100;
+  const c = v * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = v - c;
+  let r, g, b;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return (Math.round((r + m) * 255) << 16) |
+         (Math.round((g + m) * 255) << 8) |
+          Math.round((b + m) * 255);
+}
+
+export function buildColumn(dayList, rainbow) {
   const col = new Array(PANEL_H).fill(0);
   let markerSet = false;
   for (const d of dayList) {
@@ -133,14 +158,16 @@ export function buildColumn(dayList) {
       col[row] = LEVEL_COLORS[d.level] ?? LEVEL_COLORS[4];
     }
     if (!markerSet && dt.getUTCDate() === 1) {
-      col[0] = MONTH_MARKER;
+      col[0] = rainbow
+        ? hsvToPacked(monthHue(dt.getUTCMonth() + 1), 70, 70)
+        : MONTH_MARKER;
       markerSet = true;
     }
   }
   return col;
 }
 
-export function buildGrid(days) {
+export function buildGrid(days, { rainbow = true } = {}) {
   const lastDate = new Date(days[days.length - 1].date + "T00:00:00Z");
   const lastDow = lastDate.getUTCDay();
   const daysFromSat = (6 - lastDow + 7) % 7;
@@ -164,7 +191,7 @@ export function buildGrid(days) {
     if (!daysInWeek || daysInWeek.length === 0) {
       columns.push(new Array(PANEL_H).fill(0));
     } else {
-      columns.push(buildColumn(daysInWeek));
+      columns.push(buildColumn(daysInWeek, rainbow));
     }
   }
 
