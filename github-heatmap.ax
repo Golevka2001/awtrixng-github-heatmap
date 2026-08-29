@@ -1,0 +1,148 @@
+# @name    GitHub Heatmap
+# @desc    GitHub contribution heatmap via external worker
+# @author  Golevka2001
+# @version 1.0
+# @config  server         text    "Server URL"  help="Worker endpoint URL"
+# @config  user           text    "Username"  help="GitHub username"
+# @config  client_id      text    "(optional) CF Access Client ID"
+# @config  client_secret  text    "(optional) CF Access Client Secret"
+# @config  every          number  "Refresh"  default=60  min=1  unit=min
+
+class GitHubHeatmap
+  var url, usr, client_id, client_secret, pixels
+  # Refresh state: ticks counts down to the next fetch, span is the configured
+  # interval in seconds, retry is the current backoff delay, busy means a
+  # request is still out.
+  var ticks, span, retry, busy
+
+  def init()
+    self.url = ""
+    self.usr = ""
+    var srv = store.get("server")
+    var u = store.get("user")
+    if srv != nil && srv != "" && u != nil && u != ""
+      self.url = srv
+      self.usr = str(u)
+    end
+    var cid = store.get("client_id")
+    self.client_id = cid == nil ? "" : str(cid)
+    var secret = store.get("client_secret")
+    self.client_secret = secret == nil ? "" : str(secret)
+    self.pixels = []
+    self.ticks = 0
+    self.span = 60
+    self.retry = 30
+    self.busy = false
+  end
+
+  def setup()
+    self.loop()
+  end
+
+  def on_button(btn)
+    if btn == "select"
+      self.now()
+    end
+  end
+
+  def on_body(body, status)
+    shared.set("tls", 0)
+    if body == nil
+      self.failed()
+      return
+    end
+    # Extract all numbers from the JSON array [n,n,n,...].  re.matchall is
+    # cheaper than json.load on a 96 KB heap, and the full response is small
+    # enough that find/keep is not needed.
+    var m = re.matchall("[0-9]+", body)
+    if m == nil || size(m) == 0
+      self.failed()
+      return
+    end
+    var n = size(m)
+    var px = []
+    for i : 0 .. n - 1
+      px.push(int(m[i]))
+    end
+    if size(px) != 256
+      self.failed()
+      return
+    end
+    self.ok()
+    self.pixels = px
+  end
+
+  def loop()
+    if self.url != "" && self.due(store.get("every"))
+      shared.set("tls", 1)
+      http.get(self.url, / b, st -> self.on_body(b, st),
+               {'headers': {'CF-Access-Client-Id': self.client_id,
+                            'CF-Access-Client-Secret': self.client_secret,
+                            'X-User': self.usr}})
+    end
+  end
+
+  # True at most once per interval, and never while a request is still out.
+  # Also waits out other apps' TLS handshakes -- concurrent handshakes are
+  # the main OOM risk on a 96 KB heap.  busy is raised here, so only call it
+  # when a request will actually be issued.
+  def due(every)
+    self.span = max(60, num(every, 1) * 60)
+    if self.ticks > 0
+      self.ticks = self.ticks - 1
+      return false
+    end
+    if self.busy
+      return false
+    end
+    # skip this cycle while another app is mid-handshake
+    for k : shared.keys()
+      if size(k) > 4 && k[size(k) - 4 .. size(k) - 1] == ".tls" && shared.get(k) == 1
+        var a = shared.age(k)
+        if a != nil && a < 20000
+          return false
+        end
+      end
+    end
+    self.ticks = self.span
+    self.busy = true
+    return true
+  end
+
+  # Failure backoff: retry at 30s, doubling, capped at the interval.
+  def failed()
+    self.busy = false
+    self.ticks = self.retry
+    self.retry = min(self.retry * 2, self.span)
+  end
+
+  def ok()
+    self.busy = false
+    self.retry = 30
+  end
+
+  # Manual refresh: clears ticks, leaves busy alone so a press while a
+  # request is out cannot fire a second one.
+  def now()
+    self.ticks = 0
+    self.retry = 30
+  end
+
+  def draw()
+    clear()
+    if self.pixels == nil || size(self.pixels) == 0
+      var w = text_ink_width("...")
+      text(int((width() - w) / 2), 6, "...", 0x666666)
+      return
+    end
+    # 32x8 panel, row-major: pixel index i → column i/8, row i%8
+    for i : 0 .. size(self.pixels) - 1
+      var c = self.pixels[i]
+      if c != 0
+        pixel(int(i / 8), i - int(i / 8) * 8, c)
+      end
+    end
+  end
+end
+
+return GitHubHeatmap()
