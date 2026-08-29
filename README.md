@@ -13,9 +13,9 @@ AWTRIX app ──▶ Cloudflare Worker ──GraphQL──▶ GitHub API
 | File                | Role                                                                                                       |
 | ------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `github-heatmap.ax` | AWTRIX NG custom app (Berry): fetches the worker on an interval and paints the response                    |
-| `workers/`          | Cloudflare Worker: queries the GitHub GraphQL contribution calendar and renders it as the JSON array above |
+| `worker/`           | Cloudflare Worker: queries the GitHub GraphQL contribution calendar and renders it as the JSON array above |
 
-Rendering conventions: the panel shows the last 32 weeks; rows 1–7 map Sunday through Saturday, the rightmost column is the current week, and row 0 carries the month marker (grey, or a per-month hue when Rainbow Months is on).
+Rendering conventions: the panel shows the last 32 weeks; rows 1–7 map Sunday through Saturday, the rightmost column is the current week, and row 0 carries the month marker. With Show Avatar on, the leftmost 8 columns render the user's 8×8 avatar.
 
 ## 1. Create a GitHub token
 
@@ -88,6 +88,8 @@ Visit the AWTRIX NG web interface, go to **Scripts** and paste `github-heatmap.a
 | (optional) CF Access Client ID / Secret | The service token from step 3. Leave empty if not using Cloudflare Access |
 | Rainbow Months                          | Color the month markers with a per-month hue; on by default               |
 | Split by Month                          | Add a gap between months; off by default                                  |
+| Show Avatar                             | Render the user's 8×8 avatar in the leftmost columns; off by default      |
+| Avatar Contrast                         | Contrast boost for the avatar, 1–3; default 1                             |
 | Refresh                                 | Refresh interval in minutes                                               |
 
 Behavior notes: the **select** button forces an immediate refresh; failed requests back off exponentially starting at 30 s, capped at `every`.

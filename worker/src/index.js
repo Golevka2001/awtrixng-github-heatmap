@@ -1,12 +1,15 @@
 // GitHub contribution heatmap for AWTRIX NG.
 //
-// GET /?user=<github_username>[&rainbow=0][&split=1]
+// GET /?user=<github_username>[&rainbow=0][&split=1][&avatar=1][&contrast=1]
 //
 // Returns a flat JSON array of 256 packed 0xRRGGBB integers (32x8, row-major)
 // ready for the Berry app to paint pixel-by-pixel.
 //
 // The worker holds no state between requests.  Caching is left to the caller
 // (the Berry app fetches at most once per configured interval).
+
+import { decode as decodeJpegLib } from "jpeg-js";
+import UPNG from "upng-js";
 
 const GITHUB_GRAPHQL = "https://api.github.com/graphql";
 
@@ -47,8 +50,10 @@ async function handle(request, env) {
   const user = request.headers.get("X-User") || q.get("user");
   const rainbow = (request.headers.get("X-Rainbow") || q.get("rainbow") || "1") !== "0";
   const split = (request.headers.get("X-Split") || q.get("split") || "0") === "1";
+  const avatar = (request.headers.get("X-Avatar") || q.get("avatar") || "0") === "1";
+  const contrast = parseFloat(request.headers.get("X-Contrast") || q.get("contrast") || "") || 1;
 
-  console.log("request", { user, rainbow, split });
+  console.log("request", { user, avatar, rainbow, split, contrast });
 
   if (!user) return json({ error: "missing user" }, 400);
 
@@ -70,6 +75,7 @@ async function handle(request, env) {
           }
         }
       }
+      avatarUrl
     }
   }`;
 
@@ -116,8 +122,12 @@ async function handle(request, env) {
     return json({ error: "no contribution data" }, 502);
   }
 
-  console.log("github response", { user, days: days.length });
-  return json(buildGrid(days, { rainbow, split }));
+  const avatarUrl = data.data.user.avatarUrl || null;
+  console.log("github response", { user, days: days.length, hasAvatarUrl: Boolean(avatarUrl) });
+  let avatarPixels = avatar && avatarUrl ? await fetchAvatarPixels(avatarUrl) : null;
+  console.log("avatar result", { requested: avatar, fetched: Boolean(avatarPixels), pixelCount: avatarPixels ? avatarPixels.length : 0 });
+  if (avatarPixels) avatarPixels = boostContrast(avatarPixels, contrast);
+  return json(buildGrid(days, { rainbow, split, avatarPixels }));
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +178,7 @@ export function buildColumn(dayList, rainbow) {
   return col;
 }
 
-export function buildGrid(days, { rainbow = true, split = false } = {}) {
+export function buildGrid(days, { rainbow = true, split = false, avatarPixels = null } = {}) {
   const lastDate = new Date(days[days.length - 1].date + "T00:00:00Z");
   const lastDow = lastDate.getUTCDay();
   const daysFromSat = (6 - lastDow + 7) % 7;
@@ -212,9 +222,11 @@ export function buildGrid(days, { rainbow = true, split = false } = {}) {
     }
   }
 
-  // flatten to 256 pixels (row-major, right-aligned)
+  // flatten to 256 pixels (row-major, right-aligned); the avatar, when
+  // present, occupies the leftmost 8 columns
+  const leftOffset = avatarPixels && avatarPixels.length === PANEL_H * PANEL_H ? PANEL_H : 0;
   const pixels = new Array(PANEL_W * PANEL_H).fill(0);
-  const colCount = Math.min(columns.length, PANEL_W);
+  const colCount = Math.min(columns.length, PANEL_W - leftOffset);
 
   for (let c = 0; c < colCount; c++) {
     const targetCol = PANEL_W - 1 - c;
@@ -224,6 +236,120 @@ export function buildGrid(days, { rainbow = true, split = false } = {}) {
     }
   }
 
+  if (leftOffset > 0) {
+    // The panel index space is column-major (col*8+row, same as the heatmap),
+    // while avatar pixels arrive row-major (y*8+x).  Writing them transposed
+    // keeps the avatar upright; a direct copy drew it reflected across the
+    // main diagonal, putting the top-right corner where the bottom-left
+    // belongs and vice versa.
+    for (let y = 0; y < PANEL_H; y++) {
+      for (let x = 0; x < PANEL_H; x++) {
+        pixels[x * PANEL_H + y] = avatarPixels[y * PANEL_H + x];
+      }
+    }
+  }
+
+  return pixels;
+}
+
+// GitHub avatars are pastel washes that render flat on LEDs; push each channel
+// away from mid-grey to recover contrast.
+export function boostContrast(pixels, gain = 1) {
+  const out = new Array(pixels.length);
+  const f = (v) => Math.max(0, Math.min(255, Math.round((v - 128) * gain + 128)));
+  for (let i = 0; i < pixels.length; i++) {
+    const p = pixels[i];
+    const r = (p >> 16) & 0xff;
+    const g = (p >> 8) & 0xff;
+    const b = p & 0xff;
+    out[i] = (f(r) << 16) | (f(g) << 8) | f(b);
+  }
+  return out;
+}
+
+async function fetchAvatarPixels(url) {
+  const sized = new URL(url);
+  sized.searchParams.set("s", "8");
+  const response = await fetch(sized, {
+    headers: { "User-Agent": "awtrixng-github-heatmap-worker" },
+  });
+  const contentType = response.headers.get("content-type");
+  console.log("avatar fetch", { status: response.status, ok: response.ok, contentType });
+  if (!response.ok) return null;
+  const body = await response.arrayBuffer();
+  console.log("avatar body", { bytes: body.byteLength });
+  try {
+    const bytes = new Uint8Array(body);
+    const pixels =
+      bytes[0] === 0x89 && bytes[1] === 0x50 ? decodePng(bytes)
+        : bytes[0] === 0xff && bytes[1] === 0xd8 ? decodeJpeg(bytes)
+          : (() => { throw new Error("unsupported avatar format"); })();
+    console.log("avatar decode ok", { pixelCount: pixels.length });
+    return pixels;
+  } catch (err) {
+    console.error("avatar decode failed", { error: String(err && err.message) });
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avatar decoding — jpeg-js and upng-js do the heavy lifting.  Both are pure
+// JS with no dependencies and no node builtins, so they bundle cleanly for the
+// Worker.  (pngjs was considered but its sync path requires node:zlib, i.e.
+// the nodejs_compat flag; upng-js ships its own inflate.)
+// ---------------------------------------------------------------------------
+
+export function decodePng(buffer) {
+  const img = UPNG.decode(new Uint8Array(buffer));
+  const rgba = new Uint8Array(UPNG.toRGBA8(img)[0]);
+  return packRgba(downscale(rgba, img.width, img.height));
+}
+
+export function decodeJpeg(buffer) {
+  const { width, height, data } = decodeJpegLib(new Uint8Array(buffer), { formatAsRGBA: true });
+  return packRgba(downscale(data, width, height));
+}
+
+// Most avatars arrive already 8x8 (GitHub honors ?s=8 for user-uploaded
+// photos), but auto-generated identicons ignore the size param and always
+// come back 420x420.  Box-average whatever we get down to 8x8; for an 8x8
+// source this is the identity (one pixel per cell) so the verified path is
+// unchanged.
+function downscale(rgba, w, h) {
+  const out = new Uint8Array(64 * 4);
+  for (let y = 0; y < 8; y++) {
+    const y0 = Math.floor((y * h) / 8);
+    const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * h) / 8));
+    for (let x = 0; x < 8; x++) {
+      const x0 = Math.floor((x * w) / 8);
+      const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * w) / 8));
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let yy = y0; yy < y1; yy++) {
+        for (let xx = x0; xx < x1; xx++) {
+          const o = (yy * w + xx) * 4;
+          r += rgba[o];
+          g += rgba[o + 1];
+          b += rgba[o + 2];
+          n++;
+        }
+      }
+      const o = (y * 8 + x) * 4;
+      out[o] = Math.round(r / n);
+      out[o + 1] = Math.round(g / n);
+      out[o + 2] = Math.round(b / n);
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
+// Pack a 64-pixel RGBA buffer into 256 packed 0xRRGGBB values (row-major).
+function packRgba(rgba) {
+  const pixels = new Array(64);
+  for (let i = 0; i < 64; i++) {
+    const o = i * 4;
+    pixels[i] = (rgba[o] << 16) | (rgba[o + 1] << 8) | rgba[o + 2];
+  }
   return pixels;
 }
 

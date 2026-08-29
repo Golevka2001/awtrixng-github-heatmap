@@ -2,7 +2,7 @@
     "$schema": "node_modules/wrangler/config-schema.json",
     "name": "awtrixng-github-heatmap-worker",
     "main": "src/index.js",
-    "compatibility_date": "2026-08-15",
+    "compatibility_date": "2026-08-26",
     "observability": {
         "enabled": false,
         "head_sampling_rate": 1,
