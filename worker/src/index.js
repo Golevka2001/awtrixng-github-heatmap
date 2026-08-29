@@ -39,7 +39,10 @@ export default {
     try {
       out = await handle(request, env);
     } catch (err) {
-      out = json({ error: "internal", detail: String(err && err.message) }, 500);
+      out = json(
+        { error: "internal", detail: String(err && err.message) },
+        500,
+      );
     }
     return out;
   },
@@ -48,10 +51,15 @@ export default {
 async function handle(request, env) {
   const q = new URL(request.url).searchParams;
   const user = request.headers.get("X-User") || q.get("user");
-  const rainbow = (request.headers.get("X-Rainbow") || q.get("rainbow") || "1") !== "0";
-  const split = (request.headers.get("X-Split") || q.get("split") || "0") === "1";
-  const avatar = (request.headers.get("X-Avatar") || q.get("avatar") || "0") === "1";
-  const contrast = parseFloat(request.headers.get("X-Contrast") || q.get("contrast") || "") || 1;
+  const rainbow =
+    (request.headers.get("X-Rainbow") || q.get("rainbow") || "1") !== "0";
+  const split =
+    (request.headers.get("X-Split") || q.get("split") || "0") === "1";
+  const avatar =
+    (request.headers.get("X-Avatar") || q.get("avatar") || "0") === "1";
+  const contrast =
+    parseFloat(request.headers.get("X-Contrast") || q.get("contrast") || "") ||
+    1;
 
   console.log("request", { user, avatar, rainbow, split, contrast });
 
@@ -91,7 +99,10 @@ async function handle(request, env) {
 
   if (!gh.ok) {
     const text = await gh.text();
-    return json({ error: "github api", status: gh.status, detail: text.slice(0, 200) }, 502);
+    return json(
+      { error: "github api", status: gh.status, detail: text.slice(0, 200) },
+      502,
+    );
   }
 
   const data = await gh.json();
@@ -123,9 +134,18 @@ async function handle(request, env) {
   }
 
   const avatarUrl = data.data.user.avatarUrl || null;
-  console.log("github response", { user, days: days.length, hasAvatarUrl: Boolean(avatarUrl) });
-  let avatarPixels = avatar && avatarUrl ? await fetchAvatarPixels(avatarUrl) : null;
-  console.log("avatar result", { requested: avatar, fetched: Boolean(avatarPixels), pixelCount: avatarPixels ? avatarPixels.length : 0 });
+  console.log("github response", {
+    user,
+    days: days.length,
+    hasAvatarUrl: Boolean(avatarUrl),
+  });
+  let avatarPixels =
+    avatar && avatarUrl ? await fetchAvatarPixels(avatarUrl) : null;
+  console.log("avatar result", {
+    requested: avatar,
+    fetched: Boolean(avatarPixels),
+    pixelCount: avatarPixels ? avatarPixels.length : 0,
+  });
   if (avatarPixels) avatarPixels = boostContrast(avatarPixels, contrast);
   return json(buildGrid(days, { rainbow, split, avatarPixels }));
 }
@@ -147,22 +167,44 @@ export function hsvToPacked(h, s, v) {
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
   const m = v - c;
   let r, g, b;
-  if (h < 60) { r = c; g = x; b = 0; }
-  else if (h < 120) { r = x; g = c; b = 0; }
-  else if (h < 180) { r = 0; g = c; b = x; }
-  else if (h < 240) { r = 0; g = x; b = c; }
-  else if (h < 300) { r = x; g = 0; b = c; }
-  else { r = c; g = 0; b = x; }
-  return (Math.round((r + m) * 255) << 16) |
-         (Math.round((g + m) * 255) << 8) |
-          Math.round((b + m) * 255);
+  if (h < 60) {
+    r = c;
+    g = x;
+    b = 0;
+  } else if (h < 120) {
+    r = x;
+    g = c;
+    b = 0;
+  } else if (h < 180) {
+    r = 0;
+    g = c;
+    b = x;
+  } else if (h < 240) {
+    r = 0;
+    g = x;
+    b = c;
+  } else if (h < 300) {
+    r = x;
+    g = 0;
+    b = c;
+  } else {
+    r = c;
+    g = 0;
+    b = x;
+  }
+  return (
+    (Math.round((r + m) * 255) << 16) |
+    (Math.round((g + m) * 255) << 8) |
+    Math.round((b + m) * 255)
+  );
 }
 
 export function buildColumn(dayList, rainbow) {
   const col = new Array(PANEL_H).fill(0);
   let markerSet = false;
   for (const d of dayList) {
-    const dt = typeof d.date === "string" ? new Date(d.date + "T00:00:00Z") : d.date;
+    const dt =
+      typeof d.date === "string" ? new Date(d.date + "T00:00:00Z") : d.date;
     // row: Sun=1 Mon=2 ... Sat=7
     const row = dt.getUTCDay() + 1;
     if (row >= 1 && row < PANEL_H) {
@@ -178,7 +220,10 @@ export function buildColumn(dayList, rainbow) {
   return col;
 }
 
-export function buildGrid(days, { rainbow = true, split = false, avatarPixels = null } = {}) {
+export function buildGrid(
+  days,
+  { rainbow = true, split = false, avatarPixels = null } = {},
+) {
   const lastDate = new Date(days[days.length - 1].date + "T00:00:00Z");
   const lastDow = lastDate.getUTCDay();
   const daysFromSat = (6 - lastDow + 7) % 7;
@@ -213,8 +258,9 @@ export function buildGrid(days, { rainbow = true, split = false, avatarPixels = 
         monthGroups.get(key).push(d);
       }
       const groups = [...monthGroups.values()].sort(
-        (a, b) => Math.max(...b.map((d) => d.date.getTime())) -
-                   Math.max(...a.map((d) => d.date.getTime()))
+        (a, b) =>
+          Math.max(...b.map((d) => d.date.getTime())) -
+          Math.max(...a.map((d) => d.date.getTime())),
       );
       for (const g of groups) columns.push(buildColumn(g, rainbow));
     } else {
@@ -223,8 +269,10 @@ export function buildGrid(days, { rainbow = true, split = false, avatarPixels = 
   }
 
   // flatten to 256 pixels (row-major, right-aligned); the avatar, when
-  // present, occupies the leftmost 8 columns
-  const leftOffset = avatarPixels && avatarPixels.length === PANEL_H * PANEL_H ? PANEL_H : 0;
+  // present, occupies the leftmost 8 columns, followed by one blank
+  // separator column before the heatmap
+  const leftOffset =
+    avatarPixels && avatarPixels.length === PANEL_H * PANEL_H ? PANEL_H + 1 : 0;
   const pixels = new Array(PANEL_W * PANEL_H).fill(0);
   const colCount = Math.min(columns.length, PANEL_W - leftOffset);
 
@@ -256,7 +304,8 @@ export function buildGrid(days, { rainbow = true, split = false, avatarPixels = 
 // away from mid-grey to recover contrast.
 export function boostContrast(pixels, gain = 1) {
   const out = new Array(pixels.length);
-  const f = (v) => Math.max(0, Math.min(255, Math.round((v - 128) * gain + 128)));
+  const f = (v) =>
+    Math.max(0, Math.min(255, Math.round((v - 128) * gain + 128)));
   for (let i = 0; i < pixels.length; i++) {
     const p = pixels[i];
     const r = (p >> 16) & 0xff;
@@ -274,20 +323,30 @@ async function fetchAvatarPixels(url) {
     headers: { "User-Agent": "awtrixng-github-heatmap-worker" },
   });
   const contentType = response.headers.get("content-type");
-  console.log("avatar fetch", { status: response.status, ok: response.ok, contentType });
+  console.log("avatar fetch", {
+    status: response.status,
+    ok: response.ok,
+    contentType,
+  });
   if (!response.ok) return null;
   const body = await response.arrayBuffer();
   console.log("avatar body", { bytes: body.byteLength });
   try {
     const bytes = new Uint8Array(body);
     const pixels =
-      bytes[0] === 0x89 && bytes[1] === 0x50 ? decodePng(bytes)
-        : bytes[0] === 0xff && bytes[1] === 0xd8 ? decodeJpeg(bytes)
-          : (() => { throw new Error("unsupported avatar format"); })();
+      bytes[0] === 0x89 && bytes[1] === 0x50
+        ? decodePng(bytes)
+        : bytes[0] === 0xff && bytes[1] === 0xd8
+          ? decodeJpeg(bytes)
+          : (() => {
+              throw new Error("unsupported avatar format");
+            })();
     console.log("avatar decode ok", { pixelCount: pixels.length });
     return pixels;
   } catch (err) {
-    console.error("avatar decode failed", { error: String(err && err.message) });
+    console.error("avatar decode failed", {
+      error: String(err && err.message),
+    });
     return null;
   }
 }
@@ -306,7 +365,9 @@ export function decodePng(buffer) {
 }
 
 export function decodeJpeg(buffer) {
-  const { width, height, data } = decodeJpegLib(new Uint8Array(buffer), { formatAsRGBA: true });
+  const { width, height, data } = decodeJpegLib(new Uint8Array(buffer), {
+    formatAsRGBA: true,
+  });
   return packRgba(downscale(data, width, height));
 }
 
@@ -323,7 +384,10 @@ function downscale(rgba, w, h) {
     for (let x = 0; x < 8; x++) {
       const x0 = Math.floor((x * w) / 8);
       const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * w) / 8));
-      let r = 0, g = 0, b = 0, n = 0;
+      let r = 0,
+        g = 0,
+        b = 0,
+        n = 0;
       for (let yy = y0; yy < y1; yy++) {
         for (let xx = x0; xx < x1; xx++) {
           const o = (yy * w + xx) * 4;
