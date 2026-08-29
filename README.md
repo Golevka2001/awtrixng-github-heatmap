@@ -79,7 +79,7 @@ curl "https://<worker-url>/?user=<github-username>" \
 
 ## 4. Install and configure the app
 
-Visit the AWTRIX NG web interface, go to **Scripts** and paste `github-heatmap.ax` into a new script. Configure it with the following settings:
+The app is published on [AWTRIX Flows](https://flows.blueforcer.de/flow/fxaGdh4z8w5m) — install it from there, or visit the AWTRIX NG web interface, go to **Scripts** and paste `github-heatmap.ax` into a new script. Configure it with the following settings:
 
 | Setting                                 | Value                                                                     |
 | --------------------------------------- | ------------------------------------------------------------------------- |
