@@ -101,5 +101,26 @@ eq("rainbow grid length", g365r.length, 256);
 eq("rainbow marker present", g365r.some((v) => !isPalette(v)), true);
 eq("rainbow off stays palette", buildGrid(days365, { rainbow: false }).every(isPalette), true);
 
+// Split by month: 2026-08-31 is a Monday, 2026-09-01 a Tuesday — one week
+// straddling a boundary. Without split both share the newest column; with
+// split they become two columns, newest month rightmost.
+const straddle = [
+  { date: "2026-08-31", level: 1 },
+  { date: "2026-09-01", level: 4 },
+];
+const gNoSplit = buildGrid(straddle, { split: false, rainbow: false });
+eq("no split: same column", [gNoSplit[31 * 8 + 2], gNoSplit[31 * 8 + 3]], [0x0e4429, 0x39d353]);
+const gSplitWeek = buildGrid(straddle, { split: true, rainbow: false });
+eq("split: aug column left of sep", gSplitWeek[30 * 8 + 2], 0x0e4429);
+eq("split: sep column rightmost", gSplitWeek[31 * 8 + 3], 0x39d353);
+eq("split: aug day out of sep column", gSplitWeek[31 * 8 + 2], 0);
+eq("split: sep day out of aug column", gSplitWeek[30 * 8 + 3], 0);
+eq("split: sep marker in sep column", gSplitWeek[31 * 8 + 0], 0x666666);
+eq("split: no marker in aug column", gSplitWeek[30 * 8 + 0], 0);
+
+const gSplit = buildGrid(days365, { split: true });
+eq("split grid length", gSplit.length, 256);
+eq("split has pixels", gSplit.some((v) => v !== 0), true);
+
 console.log(failed ? `\n${failed} failed` : "\nall passed");
 process.exit(failed ? 1 : 0);

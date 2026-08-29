@@ -86,7 +86,8 @@ Visit the AWTRIX NG web interface, go to **Scripts** and paste `github-heatmap.a
 | Server URL                              | The worker URL from step 2                                                |
 | Username                                | GitHub username                                                           |
 | (optional) CF Access Client ID / Secret | The service token from step 3. Leave empty if not using Cloudflare Access |
-| Rainbow Months                          | Color the month marker with a per-month hue; on by default        |
+| Rainbow Months                          | Color the month markers with a per-month hue; on by default               |
+| Split by Month                          | Add a gap between months; off by default                                  |
 | Refresh                                 | Refresh interval in minutes                                               |
 
 Behavior notes: the **select** button forces an immediate refresh; failed requests back off exponentially starting at 30 s, capped at `every`.

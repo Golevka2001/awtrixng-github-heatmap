@@ -1,6 +1,6 @@
 // GitHub contribution heatmap for AWTRIX NG.
 //
-// GET /?user=<github_username>[&rainbow=0]
+// GET /?user=<github_username>[&rainbow=0][&split=1]
 //
 // Returns a flat JSON array of 256 packed 0xRRGGBB integers (32x8, row-major)
 // ready for the Berry app to paint pixel-by-pixel.
@@ -46,8 +46,9 @@ async function handle(request, env) {
   const q = new URL(request.url).searchParams;
   const user = request.headers.get("X-User") || q.get("user");
   const rainbow = (request.headers.get("X-Rainbow") || q.get("rainbow") || "1") !== "0";
+  const split = (request.headers.get("X-Split") || q.get("split") || "0") === "1";
 
-  console.log("request", { user, rainbow });
+  console.log("request", { user, rainbow, split });
 
   if (!user) return json({ error: "missing user" }, 400);
 
@@ -116,7 +117,7 @@ async function handle(request, env) {
   }
 
   console.log("github response", { user, days: days.length });
-  return json(buildGrid(days, { rainbow }));
+  return json(buildGrid(days, { rainbow, split }));
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +168,7 @@ export function buildColumn(dayList, rainbow) {
   return col;
 }
 
-export function buildGrid(days, { rainbow = true } = {}) {
+export function buildGrid(days, { rainbow = true, split = false } = {}) {
   const lastDate = new Date(days[days.length - 1].date + "T00:00:00Z");
   const lastDow = lastDate.getUTCDay();
   const daysFromSat = (6 - lastDow + 7) % 7;
@@ -190,6 +191,22 @@ export function buildGrid(days, { rainbow = true } = {}) {
     const daysInWeek = weekMap.get(wi);
     if (!daysInWeek || daysInWeek.length === 0) {
       columns.push(new Array(PANEL_H).fill(0));
+      continue;
+    }
+    if (split) {
+      // A week straddling a month boundary becomes one column per month,
+      // newest first to match the right-to-left panel layout.
+      const monthGroups = new Map();
+      for (const d of daysInWeek) {
+        const key = `${d.date.getUTCFullYear()}-${d.date.getUTCMonth()}`;
+        if (!monthGroups.has(key)) monthGroups.set(key, []);
+        monthGroups.get(key).push(d);
+      }
+      const groups = [...monthGroups.values()].sort(
+        (a, b) => Math.max(...b.map((d) => d.date.getTime())) -
+                   Math.max(...a.map((d) => d.date.getTime()))
+      );
+      for (const g of groups) columns.push(buildColumn(g, rainbow));
     } else {
       columns.push(buildColumn(daysInWeek, rainbow));
     }
