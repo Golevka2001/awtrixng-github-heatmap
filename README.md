@@ -92,4 +92,4 @@ The app is published on [AWTRIX Flows](https://flows.blueforcer.de/flow/fxaGdh4z
 | Avatar Contrast                         | Contrast boost for the avatar, 1–3; default 1                             |
 | Refresh                                 | Refresh interval in minutes                                               |
 
-Behavior notes: the **select** button forces an immediate refresh; failed requests back off exponentially starting at 30 s, capped at `every`.
+Behavior notes: the **select** button forces an immediate refresh; failed requests back off exponentially starting at 30 s, capped at `every`; until the first fetch succeeds the panel shows `...`, which becomes an orange `?` once a fetch has failed.

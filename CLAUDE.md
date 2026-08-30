@@ -9,7 +9,7 @@ A GitHub contribution heatmap for AWTRIX NG (32×8 LED matrix clock). Two compon
 - `github-heatmap.ax` — AWTRIX NG custom app written in Berry. No imports: the refresh/poll logic is inlined so the app stays one paste-able script.
 - `worker/` — Cloudflare Worker. Web-standard APIs only; the only npm packages are two pure-JS image decoders (jpeg-js, upng-js) used by the avatar feature.
 
-The worker renders everything server-side and returns a JSON array of exactly 256 packed `0xRRGGBB` integers; the app only paints pixels. The app treats any response that is not exactly 256 integers as a failure and backs off — never change the response shape.
+The worker renders everything server-side and returns a JSON array of exactly 256 packed `0xRRGGBB` integers; the app only paints pixels. The app treats a non-200 status, or any response that is not exactly 256 integers, as a failure and backs off — never change the response shape.
 
 ## Commands
 
@@ -29,7 +29,7 @@ The worker renders everything server-side and returns a JSON array of exactly 25
 ## Berry notes (`github-heatmap.ax`)
 
 - Blocks close with `end`; lambdas are `/ x -> ...`; there is no Berry formatter — match the existing 2-space style by hand.
-- The device has a 96 KB heap. The app parses responses with `re.matchall` instead of `json.load`, and serializes TLS handshakes across apps through `shared` keys (concurrent handshakes OOM the device). Keep that logic; its comments document constraints that are not visible in code.
+- The device has a 96 KB heap. The app parses responses with `re.matchall` instead of `json.load`, and serializes web requests across apps via the official `shared` `f` flag — its own `f` is set while a request is out, and it waits out other apps' `*.f` keys that are still fresh (< 20 s), because concurrent TLS handshakes OOM the device. Keep that logic; its comments document constraints that are not visible in code.
 
 ## Worker notes
 

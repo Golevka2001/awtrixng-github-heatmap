@@ -1,7 +1,7 @@
 # @name    GitHub Heatmap
 # @desc    GitHub contribution heatmap via external worker
 # @author  Golevka2001
-# @version 1.3
+# @version 1.4
 # @config  server         text    "Server URL"  help="Worker endpoint URL"
 # @config  user           text    "Username"  help="GitHub username"
 # @config  client_id      text    "(optional) CF Access Client ID"
@@ -13,7 +13,7 @@
 # @config  every          number  "Refresh"  default=60  min=1  unit=min
 
 class GitHubHeatmap
-  var url, usr, client_id, client_secret, rainbow, split, avatar, contrast, pixels
+  var url, usr, client_id, client_secret, rainbow, split, avatar, contrast, pixels, err
   # Refresh state: ticks counts down to the next fetch, span is the configured
   # interval in seconds, retry is the current backoff delay, busy means a
   # request is still out.
@@ -41,6 +41,7 @@ class GitHubHeatmap
     var ct = store.get("contrast")
     self.contrast = ct == nil ? 1 : ct
     self.pixels = []
+    self.err = false
     self.ticks = 0
     self.span = 60
     self.retry = 30
@@ -58,8 +59,8 @@ class GitHubHeatmap
   end
 
   def on_body(body, status)
-    shared.set("tls", 0)
-    if body == nil
+    shared.set("f", 0)
+    if status != 200 || body == nil
       self.failed()
       return
     end
@@ -86,7 +87,7 @@ class GitHubHeatmap
 
   def loop()
     if self.url != "" && self.due(store.get("every"))
-      shared.set("tls", 1)
+      shared.set("f", 1)
       http.get(self.url, / b, st -> self.on_body(b, st),
                {'headers': {'CF-Access-Client-Id': self.client_id,
                             'CF-Access-Client-Secret': self.client_secret,
@@ -98,10 +99,9 @@ class GitHubHeatmap
     end
   end
 
-  # True at most once per interval, and never while a request is still out.
-  # Also waits out other apps' TLS handshakes -- concurrent handshakes are
-  # the main OOM risk on a 96 KB heap.  busy is raised here, so only call it
-  # when a request will actually be issued.
+  # Fires at most once per interval, never while a request is out or another
+  # app's TLS handshake is running (shared "f" flag, official convention).
+  # Raises busy, so only call it when a request will actually be issued.
   def due(every)
     self.span = max(60, num(every, 1) * 60)
     if self.ticks > 0
@@ -111,9 +111,9 @@ class GitHubHeatmap
     if self.busy
       return false
     end
-    # skip this cycle while another app is mid-handshake
     for k : shared.keys()
-      if size(k) > 4 && k[size(k) - 4 .. size(k) - 1] == ".tls" && shared.get(k) == 1
+      var n = size(k)
+      if n > 2 && k[n - 2 .. n - 1] == ".f" && shared.get(k) == 1
         var a = shared.age(k)
         if a != nil && a < 20000
           return false
@@ -125,16 +125,19 @@ class GitHubHeatmap
     return true
   end
 
-  # Failure backoff: retry at 30s, doubling, capped at the interval.
+  # failure backoff: retry at 30s, doubling, capped at the interval; raises
+  # err so a fetch with no data yet can show "?" instead of "..."
   def failed()
     self.busy = false
     self.ticks = self.retry
     self.retry = min(self.retry * 2, self.span)
+    self.err = true
   end
 
   def ok()
     self.busy = false
     self.retry = 30
+    self.err = false
   end
 
   # Manual refresh: clears ticks, leaves busy alone so a press while a
@@ -147,8 +150,9 @@ class GitHubHeatmap
   def draw()
     clear()
     if self.pixels == nil || size(self.pixels) == 0
-      var w = text_ink_width("...")
-      text(int((width() - w) / 2), 6, "...", 0x666666)
+      var s = self.err ? "?" : "..."
+      var w = text_ink_width(s)
+      text(int((width() - w) / 2), 6, s, self.err ? 0xCC7722 : 0x666666)
       return
     end
     # 32x8 panel, row-major: pixel index i → column i/8, row i%8
