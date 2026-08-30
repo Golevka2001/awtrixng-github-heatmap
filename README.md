@@ -1,5 +1,7 @@
 # awtrixng-github-heatmap
 
+English | [简体中文](README.zh-CN.md)
+
 ![preview](./README.assets/preview.gif)
 
 A GitHub contribution heatmap for AWTRIX NG, rendered on the 32×8 LED panel.
@@ -21,7 +23,7 @@ Rendering conventions: the panel shows the last 32 weeks; rows 1–7 map Sunday 
 
 ## 1. Create a GitHub token
 
-The worker only reads public data, so a classic **personal access token** with the `read:user` scope is all it needs.
+The worker only reads public data, so a **classic personal access token** with the `read:user` scope is all it needs.
 
 1. Create one at <https://github.com/settings/tokens/new>.
 2. Name it and tick `read:user`.
@@ -39,7 +41,7 @@ Add a secret named `GITHUB_TOKEN` and paste the token from step 1.
 
 ### Manual Deployment
 
-To deploy manually instead, you need to clone the repo and install [Wrangler](https://developers.cloudflare.com/workers/wrangler/):
+To deploy manually instead, you need to clone the repo and install [wrangler](https://developers.cloudflare.com/workers/wrangler/):
 
 ```sh
 cd worker
