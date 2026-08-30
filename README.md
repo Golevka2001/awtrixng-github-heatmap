@@ -4,6 +4,8 @@
 
 A GitHub contribution heatmap for AWTRIX NG, rendered on the 32×8 LED panel.
 
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Golevka2001/awtrixng-github-heatmap/tree/main/worker)
+
 ```plaintext
 AWTRIX app ──▶ Cloudflare Worker ──GraphQL──▶ GitHub API
     ▲                 │
@@ -27,7 +29,17 @@ The worker only reads public data, so a classic **personal access token** with t
 
 ## 2. Deploy the worker
 
-This needs a Cloudflare account and wrangler installed.
+### (Recommended) Deploy with the button
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/Golevka2001/awtrixng-github-heatmap/tree/main/worker)
+
+Click the button to deploy the worker.
+
+Add a secret named `GITHUB_TOKEN` and paste the token from step 1.
+
+### Manual Deployment
+
+To deploy manually instead, you need to clone the repo and install [Wrangler](https://developers.cloudflare.com/workers/wrangler/):
 
 ```sh
 cd worker
