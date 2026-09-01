@@ -103,7 +103,6 @@ The app is published on [AWTRIX Flows](https://flows.blueforcer.de/flow/fxaGdh4z
 | Rainbow Months                          | Color the month markers with a per-month hue; on by default               |
 | Split by Month                          | Add a gap between months; off by default                                  |
 | Show Avatar                             | Render the user's 8×8 avatar in the leftmost columns; off by default      |
-| Avatar Contrast                         | Contrast boost for the avatar, 1–3; default 1                             |
 | Refresh                                 | Refresh interval in minutes                                               |
 
 Behavior notes: the **select** button forces an immediate refresh; failed requests back off exponentially starting at 30 s, capped at `every`; until the first fetch succeeds the panel shows `...`, which becomes an orange `?` once a fetch has failed.

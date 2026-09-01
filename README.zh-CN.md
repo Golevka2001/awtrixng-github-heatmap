@@ -103,7 +103,6 @@ curl "https://<worker-url>/?user=<github-username>" \
 | Rainbow Months                       | 用彩虹色显示月份标记；默认开启                           |
 | Split by Month                       | 在月份之间留出空隙；默认关闭                             |
 | Show Avatar                          | 在最左侧几列渲染用户的 8×8 头像；默认关闭                |
-| Avatar Contrast                      | 头像对比度增强，1–3；默认 1                              |
 | Refresh                              | 刷新间隔（分钟）                                         |
 
 行为说明：**select** 按钮会立即强制刷新一次；请求失败后从 30 秒起指数退避，上限为 `Refresh` 设定的间隔；首次拉取成功前面板显示 `...`，一旦有失败的请求就会变成橙色的 `?`。

@@ -23,7 +23,7 @@ The worker renders everything server-side and returns a JSON array of exactly 25
 - 256 integers, row-major: index `i` → column `i/8`, row `i%8`.
 - Newest week is the rightmost column; 32 columns ≈ the last 32 weeks.
 - Rows 1–7 map Sunday–Saturday. Row 0 holds the month marker: grey (`0x666666`), or a per-month hue when rainbow is on.
-- Request options: `X-User` header or `?user=` (required); `X-Rainbow` (default on); `X-Split` (default off — a week straddling two months shares one column; when on, each month gets its own column, newest rightmost); `X-Avatar` (default off); `X-Contrast` (avatar boost, default 1).
+- Request options: `X-User` header or `?user=` (required); `X-Rainbow` (default on); `X-Split` (default off — a week straddling two months shares one column; when on, each month gets its own column, newest rightmost); `X-Avatar` (default off).
 - With the avatar on, the leftmost 8 columns hold the user's 8×8 avatar, the next column is a blank separator, and the heatmap shrinks to the remaining 23 columns. Avatar pixels arrive row-major and are written transposed into the column-major panel; get this wrong and the avatar renders mirrored across the diagonal.
 
 ## Berry notes (`github-heatmap.ax`)
